@@ -58,10 +58,11 @@ type K8sIPResolver struct {
 }
 
 type Workload struct {
-	Name      string
-	Namespace string
-	Kind      string
-	Owner     string
+	Name           string
+	Namespace      string
+	Kind           string
+	Owner          string
+	ServiceAccount string
 }
 
 func NewK8sIPResolver(clientset kubernetes.Interface, resolveDns bool, traverseUpHierarchy bool) (*K8sIPResolver, error) {
@@ -111,9 +112,10 @@ func (resolver *K8sIPResolver) ResolveIP(ip string) Workload {
 		}
 	}
 	return Workload{
-		Name:      host,
-		Namespace: "external",
-		Kind:      "external",
+		Name:           host,
+		Namespace:      "external",
+		Kind:           "external",
+		ServiceAccount: "",
 	}
 }
 
@@ -363,9 +365,10 @@ func (resolver *K8sIPResolver) handleNodeWatchEvent(nodeEvent *watch.Event) {
 		resolver.snapshot.Nodes.Store(node.UID, *node)
 		for _, nodeAddress := range node.Status.Addresses {
 			resolver.storeWorkloadsIP(nodeAddress.Address, &Workload{
-				Name:      node.Name,
-				Namespace: "node",
-				Kind:      "node",
+				Name:           node.Name,
+				Namespace:      "node",
+				Kind:           "node",
+				ServiceAccount: "",
 			})
 		}
 	case watch.Deleted:
@@ -599,9 +602,10 @@ func (resolver *K8sIPResolver) updateIpMapping() {
 		}
 		// services has (potentially multiple) ClusterIP
 		workload := Workload{
-			Name:      service.Name,
-			Namespace: service.Namespace,
-			Kind:      "Service",
+			Name:           service.Name,
+			Namespace:      service.Namespace,
+			Kind:           "Service",
+			ServiceAccount: "",
 		}
 
 		// TODO maybe try to match service to workload
@@ -635,9 +639,10 @@ func (resolver *K8sIPResolver) updateIpMapping() {
 		}
 		for _, nodeAddress := range node.Status.Addresses {
 			workload := Workload{
-				Name:      node.Name,
-				Namespace: "node",
-				Kind:      "node",
+				Name:           node.Name,
+				Namespace:      "node",
+				Kind:           "node",
+				ServiceAccount: "",
 			}
 			resolver.storeWorkloadsIP(nodeAddress.Address, &workload)
 		}
@@ -744,10 +749,12 @@ func (resolver *K8sIPResolver) resolvePodDescriptor(pod *v1.Pod) Workload {
 	name := pod.Name
 	namespace := pod.Namespace
 	kind := "pod"
+	serviceAccount := pod.Spec.ServiceAccountName
 	result := Workload{
-		Name:      name,
-		Namespace: namespace,
-		Kind:      kind,
+		Name:           name,
+		Namespace:      namespace,
+		Kind:           kind,
+		ServiceAccount: serviceAccount,
 	}
 
 	if resolver.traverseUpHierarchy {
